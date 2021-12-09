@@ -27,6 +27,8 @@ private:
 	void generateInitialVertices();
 	void divideTriangle(uint32_t index);
 
+	double calculateTriangleCost(uint32_t index);
+
 	VertexGenerator m_vertexGenerator;
 
 	double m_scale = 2;
@@ -34,5 +36,7 @@ private:
 
 	std::vector<Vertex> m_vertices;
 	std::vector<uint32_t> m_indices;
+
+	std::vector<double> m_triangleCosts;
 };
 
