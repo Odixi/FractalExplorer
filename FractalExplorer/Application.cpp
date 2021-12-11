@@ -95,23 +95,28 @@ void Application::run()
         glm::vec2 oldMousePos = m_mouseInfo.position;
         double x, y;
         glfwGetCursorPos(m_window, &x, &y);
-        m_mouseInfo.position = { x,y };
+        m_mouseInfo.position = { -x,y };
 
         // Handle input - todo move
         if (m_mouseInfo.buttons & mouse::mouseLeft) {
             auto delta = m_mouseInfo.position - oldMousePos;
-            m_navigationInfo.position -= (delta / m_navigationInfo.zoom);
+            m_navigationInfo.position += (delta * 0.001f / m_navigationInfo.zoom);
             std::cout << "pos: " << m_navigationInfo.position.x << " " << m_navigationInfo.position.y << std::endl;
         }
 
         /* Render here */
         glClear(GL_COLOR_BUFFER_BIT);
-        
-        triangleHandler.generateVertices(20);
+
+        // Screen bb
+        auto screenSize = glm::vec2{1,1} * (1.0f / m_navigationInfo.zoom);
+        geom::BBox2 screenBb{ m_navigationInfo.position - (screenSize), m_navigationInfo.position + (screenSize) };
+
+        triangleHandler.removeTrianglesOutsideScreen(screenBb, 1000);
+        triangleHandler.generateVertices(screenBb, 1000);
         const auto& indices = triangleHandler.getIndeices();
         const auto& vertices = triangleHandler.getVertices();
 
-        glUniform4f(locationUniformId, -m_navigationInfo.position.x * 0.001f, m_navigationInfo.position.y * 0.001f, 0.0f, 1.0f);
+        glUniform4f(locationUniformId, m_navigationInfo.position.x, m_navigationInfo.position.y, 0.0f, 1.0f);
         glUniform1f(zoomUniformId, m_navigationInfo.zoom);
         glBufferData(GL_ELEMENT_ARRAY_BUFFER, indices.size() * sizeof(int), indices.data(), GL_DYNAMIC_DRAW);
         glBufferData(GL_ARRAY_BUFFER, vertices.size() * sizeof(Vertex), vertices.data(), GL_DYNAMIC_DRAW);

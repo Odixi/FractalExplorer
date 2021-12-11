@@ -9,7 +9,7 @@ uniform vec4 camera;
 uniform float zoom;
 
 void main() {
-	gl_Position = (position + camera)*zoom;
+	gl_Position = (position - camera)*zoom;
 	gl_Position.w = 1;
 	outColor = color;
 };

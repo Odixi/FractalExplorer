@@ -2,28 +2,94 @@
 
 #include "TriangleHandler.h"
 
-void TriangleHandler::generateVertices(int amount)
+void TriangleHandler::generateVertices(const geom::BBox2& screenBb, int amount)
 {
-	if (m_vertices.empty()) {
+	if (m_vertices.empty() || m_indices.empty()) {
 		generateInitialVertices();
 	}
+
+	const int slices = m_triangleCosts.size() / amount;
 
 	for (int i = 0; i < amount; ++i) {
 		if (m_vertices.size() >= constants::maxVertices) {
 			return;
 		}
 		//const uint32_t randomIndex = rand() % (m_indices.size() / 3);
-		const auto max = std::ranges::max_element(m_triangleCosts);
-		const uint32_t index = std::distance(m_triangleCosts.begin(), max);
+		const auto start = m_triangleCosts.begin() + (i * slices);
+		const auto end = start + slices;
 
-		divideTriangle(index * 3);
+		const auto max = std::ranges::max_element(start, end);
+		uint32_t index = std::distance(m_triangleCosts.begin(), max);
+		
+		uint32_t triangleIndex = index * 3;
+		auto p1 = m_indices[triangleIndex];
+		auto p2 = m_indices[triangleIndex + 1];
+		auto p3 = m_indices[triangleIndex + 2];
+		glm::vec2 triangle[3] = { m_vertices[p1].pos, m_vertices[p2].pos, m_vertices[p3].pos };
+		if (!screenBb.containsAny(triangle)) {
+			m_triangleCosts[index] -= 1;
+			continue;
+		}
+
+		divideTriangle(triangleIndex);
 	}
+}
+
+void TriangleHandler::removeTrianglesOutsideScreen(const geom::BBox2& screenBb, int maxToRemove)
+{
+	std::vector<uint32_t> indicesToRemove;
+	std::vector<uint32_t> verticesToRemove; // There are not neccessarily removed
+	for (uint32_t i = 0; i < m_indices.size(); i += 3) {
+		auto p1 = m_indices[i];
+		auto p2 = m_indices[i+1];
+		auto p3 = m_indices[i+2];
+		glm::vec2 triangle[3] = {m_vertices[p1].pos, m_vertices[p2].pos, m_vertices[p3].pos };
+		if (!screenBb.containsAny(triangle)) {
+			indicesToRemove.push_back(i);
+			verticesToRemove.push_back(p1);
+			verticesToRemove.push_back(p2);
+			verticesToRemove.push_back(p3);
+			if (indicesToRemove.size() >= maxToRemove) {
+				break;
+			}
+		}
+	}
+
+	if (indicesToRemove.empty()) {
+		return;
+	}
+
+	// The indices are quaranteed to be in order
+	// Go backwars so that removing doesn't 'shift' the other indices
+	for (int i = indicesToRemove.size() - 1; i >= 0; --i) {
+		m_indices.erase(m_indices.begin() + indicesToRemove[i], m_indices.begin() + indicesToRemove[i] + 3);
+		m_triangleCosts.erase(m_triangleCosts.begin() + indicesToRemove[i] / 3);
+	}
+
+	std::ranges::sort(verticesToRemove);
+	auto [first, last] = std::ranges::unique(verticesToRemove);
+	verticesToRemove.erase(first, last);
+
+	// Remove if it is still reference by some triangles
+	std::erase_if(verticesToRemove, 
+		[&](const uint32_t& removed) {
+		return std::ranges::any_of(m_indices, 
+			[&](const uint32_t& current) {
+			return removed == current; 
+		}); 
+	});
+
+	// Mark as free
+	m_freeEntries.insert(m_freeEntries.begin(), verticesToRemove.begin(), verticesToRemove.end());
+
+	//removeVerices(verticesToRemove);
 }
 
 void TriangleHandler::generateInitialVertices()
 {
-	m_vertices.reserve(1000000);
-	m_indices.reserve(1000000);
+	m_vertices.reserve(constants::maxVertices);
+	m_indices.reserve(constants::maxVertices);
+	m_freeEntries.reserve(constants::maxVertices);
 
 	m_vertices = std::vector<Vertex>{
 		m_vertexGenerator({1,1}, m_scale, m_maxIterations),
@@ -78,8 +144,17 @@ void TriangleHandler::divideTriangle(uint32_t index)
 		tip = ti1;
 	}
 	auto middle = getMiddle(hi0, hi1);
-	const uint32_t newIndex = m_vertices.size();
-	m_vertices.push_back(m_vertexGenerator(middle, m_scale, m_maxIterations));
+
+	uint32_t newIndex;
+	if (m_freeEntries.empty()) {
+		newIndex = m_vertices.size();
+		m_vertices.push_back(m_vertexGenerator(middle, m_scale, m_maxIterations));
+	}
+	else {
+		newIndex = m_freeEntries.back();
+		m_freeEntries.pop_back();
+		m_vertices[newIndex] = m_vertexGenerator(middle, m_scale, m_maxIterations);
+	}
 
 	const auto slice = [&](uint32_t originalStartIndex, uint32_t h0, uint32_t h1, uint32_t t) ->void {
 		// Use the old triangle slot
@@ -120,6 +195,22 @@ void TriangleHandler::divideTriangle(uint32_t index)
 	return;
 }
 
+void TriangleHandler::removeVerices(const std::vector<uint32_t>& vertexIndices)
+{
+	for (int i = static_cast<int>(vertexIndices.size()) - 1; i >= 0; --i) {
+		// Swap the vertex to the end, erase it and update the swapped vertex indices
+		const uint32_t index = vertexIndices[i];
+		const uint32_t last = m_vertices.size() - 1;
+		m_vertices[index] = m_vertices[last];
+		for (uint32_t j = 0; j < m_indices.size(); ++j) {
+			if (m_indices[j] == last) {
+				m_indices[j] = index;
+			}
+		}
+		m_vertices.pop_back();
+	}
+}
+
 double TriangleHandler::calculateTriangleCost(uint32_t index)
 {
 	const Vertex& v0 = m_vertices[m_indices[index]];
@@ -143,8 +234,8 @@ double TriangleHandler::calculateTriangleCost(uint32_t index)
 	
 	const double totalSideLen = lenghts[0] + lenghts[1] + lenghts[2];
 
-	const double slRatio = std::ranges::max(lenghts) / std::ranges::min(lenghts);
+	//const double slRatio = std::ranges::max(lenghts) / std::ranges::min(lenghts);
 
 
-	return (0.00001+colorDiff) * ((totalSideLen*slRatio));
+	return (0.000001+colorDiff) * ((totalSideLen/**slRation*/));
 }
