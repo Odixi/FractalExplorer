@@ -111,7 +111,7 @@ void Application::run()
         auto screenSize = glm::vec2{1,1} * (1.0f / m_navigationInfo.zoom);
         geom::BBox2 screenBb{ m_navigationInfo.position - (screenSize), m_navigationInfo.position + (screenSize) };
 
-        triangleHandler.removeTrianglesOutsideScreen(screenBb, 1000);
+        triangleHandler.removeTrianglesOutsideScreen(screenBb, 10000);
         triangleHandler.generateVertices(screenBb, 1000);
         const auto& indices = triangleHandler.getIndeices();
         const auto& vertices = triangleHandler.getVertices();

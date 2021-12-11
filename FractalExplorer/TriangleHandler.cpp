@@ -11,7 +11,7 @@ void TriangleHandler::generateVertices(const geom::BBox2& screenBb, int amount)
 	const int slices = m_triangleCosts.size() / amount;
 
 	for (int i = 0; i < amount; ++i) {
-		if (m_vertices.size() >= constants::maxVertices) {
+		if (m_vertices.size()-m_freeEntries.size() >= constants::maxVertices) {
 			return;
 		}
 		//const uint32_t randomIndex = rand() % (m_indices.size() / 3);
@@ -61,26 +61,41 @@ void TriangleHandler::removeTrianglesOutsideScreen(const geom::BBox2& screenBb, 
 
 	// The indices are quaranteed to be in order
 	// Go backwars so that removing doesn't 'shift' the other indices
+	size_t lastIndex = m_indices.size();
 	for (int i = indicesToRemove.size() - 1; i >= 0; --i) {
-		m_indices.erase(m_indices.begin() + indicesToRemove[i], m_indices.begin() + indicesToRemove[i] + 3);
-		m_triangleCosts.erase(m_triangleCosts.begin() + indicesToRemove[i] / 3);
+		const int indexToRemove = indicesToRemove[i];
+		m_nrVertRef[m_indices[indexToRemove]]--;
+		m_nrVertRef[m_indices[indexToRemove+1]]--;
+		m_nrVertRef[m_indices[indexToRemove+2]]--;
+		m_indices[indexToRemove + 2] = m_indices[--lastIndex];
+		m_indices[indexToRemove + 1] = m_indices[--lastIndex];
+		m_indices[indexToRemove] = m_indices[--lastIndex];
+		m_triangleCosts[indexToRemove / 3] = m_triangleCosts[lastIndex / 3];
 	}
+	m_indices.erase(m_indices.begin() + lastIndex, m_indices.end());
+	m_triangleCosts.erase(m_triangleCosts.begin() + lastIndex /3, m_triangleCosts.end());
 
 	std::ranges::sort(verticesToRemove);
 	auto [first, last] = std::ranges::unique(verticesToRemove);
 	verticesToRemove.erase(first, last);
 
 	// Remove if it is still reference by some triangles
-	std::erase_if(verticesToRemove, 
-		[&](const uint32_t& removed) {
-		return std::ranges::any_of(m_indices, 
-			[&](const uint32_t& current) {
-			return removed == current; 
-		}); 
-	});
+	//std::erase_if(verticesToRemove, 
+	//	[&](const uint32_t& removed) {
+	//	return std::ranges::any_of(m_indices, 
+	//		[&](const uint32_t& current) {
+	//		return removed == current; 
+	//	}); 
+	//});
 
 	// Mark as free
-	m_freeEntries.insert(m_freeEntries.begin(), verticesToRemove.begin(), verticesToRemove.end());
+	for (const auto& index : verticesToRemove) {
+		if (m_nrVertRef[index] == 0) {
+			m_freeEntries.push_back(index);
+		}
+	}
+	
+	//m_freeEntries.insert(m_freeEntries.begin(), verticesToRemove.begin(), verticesToRemove.end());
 
 	//removeVerices(verticesToRemove);
 }
@@ -105,6 +120,10 @@ void TriangleHandler::generateInitialVertices()
 
 	m_triangleCosts.push_back(calculateTriangleCost(0));
 	m_triangleCosts.push_back(calculateTriangleCost(3));
+
+	m_nrVertRef = std::vector<int>{
+		2, 1, 2, 1
+	};
 }
 
 void TriangleHandler::divideTriangle(uint32_t index)
@@ -149,6 +168,7 @@ void TriangleHandler::divideTriangle(uint32_t index)
 	if (m_freeEntries.empty()) {
 		newIndex = m_vertices.size();
 		m_vertices.push_back(m_vertexGenerator(middle, m_scale, m_maxIterations));
+		m_nrVertRef.push_back(0);
 	}
 	else {
 		newIndex = m_freeEntries.back();
@@ -168,6 +188,10 @@ void TriangleHandler::divideTriangle(uint32_t index)
 		m_indices.push_back(t);
 		m_indices.push_back(h1);
 		m_triangleCosts.push_back(calculateTriangleCost(newTriIndex));
+
+		// Add vertex refs
+		m_nrVertRef[t]++;
+		m_nrVertRef[newIndex] += 2;
 	};
 
 	slice(index, hi0, hi1, tip);

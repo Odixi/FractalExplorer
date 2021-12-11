@@ -43,6 +43,7 @@ private:
 	std::vector<Vertex> m_vertices;
 	std::vector<uint32_t> m_indices;
 
+	std::vector<int> m_nrVertRef; // Number of trianlges a vertex refers to
 	std::vector<uint32_t> m_freeEntries;
 
 	std::vector<double> m_triangleCosts;
