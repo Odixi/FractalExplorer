@@ -14,4 +14,6 @@
 #include <functional>
 
 #include <glm.hpp>
+#include <gtx/compatibility.hpp>
+
 #include "glUtils.h"

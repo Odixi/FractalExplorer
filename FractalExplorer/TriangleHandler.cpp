@@ -79,31 +79,20 @@ void TriangleHandler::removeTrianglesOutsideScreen(const geom::BBox2& screenBb, 
 	auto [first, last] = std::ranges::unique(verticesToRemove);
 	verticesToRemove.erase(first, last);
 
-	// Remove if it is still reference by some triangles
-	//std::erase_if(verticesToRemove, 
-	//	[&](const uint32_t& removed) {
-	//	return std::ranges::any_of(m_indices, 
-	//		[&](const uint32_t& current) {
-	//		return removed == current; 
-	//	}); 
-	//});
-
 	// Mark as free
 	for (const auto& index : verticesToRemove) {
 		if (m_nrVertRef[index] == 0) {
 			m_freeEntries.push_back(index);
 		}
 	}
-	
-	//m_freeEntries.insert(m_freeEntries.begin(), verticesToRemove.begin(), verticesToRemove.end());
 
-	//removeVerices(verticesToRemove);
 }
 
 void TriangleHandler::generateInitialVertices()
 {
 	m_vertices.reserve(constants::maxVertices);
-	m_indices.reserve(constants::maxVertices);
+	m_nrVertRef.reserve(constants::maxVertices);
+	m_indices.reserve(constants::maxVertices*3);
 	m_freeEntries.reserve(constants::maxVertices);
 
 	m_vertices = std::vector<Vertex>{
@@ -117,6 +106,7 @@ void TriangleHandler::generateInitialVertices()
 		0,1,2,
 		2,3,0
 	};
+
 
 	m_triangleCosts.push_back(calculateTriangleCost(0));
 	m_triangleCosts.push_back(calculateTriangleCost(3));

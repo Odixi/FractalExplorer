@@ -9,6 +9,7 @@ struct Vertex {
 	Color color;
 };
 
+
 using VertexGenerator = std::function<Vertex(glm::vec2, double, int)>;
 
 namespace constants {
@@ -38,13 +39,13 @@ private:
 	VertexGenerator m_vertexGenerator;
 
 	double m_scale = 2;
-	int m_maxIterations = 400;
+	int m_maxIterations = 300;
 
 	std::vector<Vertex> m_vertices;
 	std::vector<uint32_t> m_indices;
 
 	std::vector<int> m_nrVertRef; // Number of trianlges a vertex refers to
-	std::vector<uint32_t> m_freeEntries;
+	std::vector<uint32_t> m_freeEntries; // array of indices that are free in m_vertices
 
 	std::vector<double> m_triangleCosts;
 };

@@ -78,11 +78,37 @@ void Application::run()
     auto locationUniformId = glGetUniformLocation(program->getId(), "camera");
     auto zoomUniformId = glGetUniformLocation(program->getId(), "zoom");
 
+    constexpr auto getColor = [](double value)->Color {
+        constexpr int divider = 400;
+        const int floor = static_cast<int>(value);
+        double v = (floor % divider) + value - floor;
+        Color colors[] = {
+            Color{0,0,0,1},
+            Color{0,0,1,1},
+            Color{0,1,1,1},
+            Color{1,0,0,1},
+            Color{1,1,0,1},
+            Color{1,1,1,1},
+        };
+        const auto size = std::size(colors);
+        const double slice = static_cast<double>(divider) / size;
+        for (int i = 0; i < size; ++i) {
+            double start = i * slice;
+            if (v <= start) {
+                Color c1 = colors[i];
+                Color c2 = i < size - 1 ? colors[i + 1] : colors[0];
+                float f = (start - v) / slice;
+                return glm::lerp(c2, c1, {f,f,f,f});
+            }
+        }
+        return { 0,0,0,0 };
+    };
+
 
     TriangleHandler triangleHandler{ [](glm::vec2 pos, double scale, int maxIter ) {
         auto a = mandelbrot::calculateSmoothEscapeTime(std::complex<float>(pos.x, pos.y), maxIter);
-        float c = a / (double)maxIter;
-        return Vertex{ pos, Color{c,c,c,1} };
+        //float c = a / (double)maxIter;
+        return Vertex{ pos, getColor(a) };
     } };
 
     //glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
@@ -112,7 +138,7 @@ void Application::run()
         geom::BBox2 screenBb{ m_navigationInfo.position - (screenSize), m_navigationInfo.position + (screenSize) };
 
         triangleHandler.removeTrianglesOutsideScreen(screenBb, 10000);
-        triangleHandler.generateVertices(screenBb, 1000);
+        triangleHandler.generateVertices(screenBb, 500);
         const auto& indices = triangleHandler.getIndeices();
         const auto& vertices = triangleHandler.getVertices();
 
