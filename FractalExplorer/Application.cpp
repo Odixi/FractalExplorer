@@ -111,8 +111,6 @@ void Application::run()
         return Vertex{ pos, getColor(a) };
     } };
 
-    //glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
-
     /* Loop until the user closes the window */
     while (!glfwWindowShouldClose(m_window))
     {
@@ -121,29 +119,35 @@ void Application::run()
         glm::vec2 oldMousePos = m_mouseInfo.position;
         double x, y;
         glfwGetCursorPos(m_window, &x, &y);
-        m_mouseInfo.position = { -x,y };
+        m_mouseInfo.position = { x,y };
 
         // Handle input - todo move
         if (m_mouseInfo.buttons & mouse::mouseLeft) {
-            auto delta = m_mouseInfo.position - oldMousePos;
-            m_navigationInfo.position += (delta * 0.001f / m_navigationInfo.zoom);
-            std::cout << "pos: " << m_navigationInfo.position.x << " " << m_navigationInfo.position.y << std::endl;
+            auto delta = (m_mouseInfo.position - oldMousePos);
+            delta.x *= -1; 
+            m_navigationInfo.realPosition += (delta * 0.001f / m_navigationInfo.realZoom);
+            std::cout << "pos: " << m_navigationInfo.realPosition.x << " " << m_navigationInfo.realPosition.y << std::endl;
+            std::cout << "worldPos: " << mouseWorldPos().x << " " << mouseWorldPos().y << std::endl;
         }
+
+        // Interpolate real position and camera position
+        m_navigationInfo.cameraPosition = glm::lerp(m_navigationInfo.realPosition, m_navigationInfo.cameraPosition, glm::vec2(m_navigationInfo.interpalotionValue, m_navigationInfo.interpalotionValue));
+        m_navigationInfo.cameraZoom = glm::lerp(m_navigationInfo.realZoom, m_navigationInfo.cameraZoom, m_navigationInfo.interpalotionValue);
 
         /* Render here */
         glClear(GL_COLOR_BUFFER_BIT);
 
         // Screen bb
-        auto screenSize = glm::vec2{1,1} * (1.0f / m_navigationInfo.zoom);
-        geom::BBox2 screenBb{ m_navigationInfo.position - (screenSize), m_navigationInfo.position + (screenSize) };
+        auto screenSize = glm::vec2{1,1} * (1.0f / m_navigationInfo.cameraZoom);
+        geom::BBox2 screenBb{ m_navigationInfo.cameraPosition - (screenSize), m_navigationInfo.cameraPosition + (screenSize) };
 
         triangleHandler.removeTrianglesOutsideScreen(screenBb, 10000);
-        triangleHandler.generateVertices(screenBb, 500);
+        triangleHandler.generateVertices(screenBb, 100);
         const auto& indices = triangleHandler.getIndeices();
         const auto& vertices = triangleHandler.getVertices();
 
-        glUniform4f(locationUniformId, m_navigationInfo.position.x, m_navigationInfo.position.y, 0.0f, 1.0f);
-        glUniform1f(zoomUniformId, m_navigationInfo.zoom);
+        glUniform4f(locationUniformId, m_navigationInfo.cameraPosition.x, m_navigationInfo.cameraPosition.y, 0.0f, 1.0f);
+        glUniform1f(zoomUniformId, m_navigationInfo.cameraZoom);
         glBufferData(GL_ELEMENT_ARRAY_BUFFER, indices.size() * sizeof(int), indices.data(), GL_DYNAMIC_DRAW);
         glBufferData(GL_ARRAY_BUFFER, vertices.size() * sizeof(Vertex), vertices.data(), GL_DYNAMIC_DRAW);
 
@@ -161,13 +165,41 @@ void Application::run()
 
 void Application::onScrollUp(float amount)
 {
-    m_navigationInfo.zoom *= (glm::pow(1.1f, amount));
+    zoom(glm::pow(1.1f, amount));
 }
 
 void Application::onScrollDown(float amount)
 {
-    m_navigationInfo.zoom *= (glm::pow(0.9f, amount));
+    zoom(glm::pow(0.9f, amount));
 }
+
+void Application::zoom(float multiplier)
+{
+    m_navigationInfo.realZoom *= multiplier;
+
+    // Move camera towards current cursor poosition
+    auto dir = mouseWorldPos() - m_navigationInfo.realPosition;
+    m_navigationInfo.realPosition += dir * (multiplier - 1);
+}
+
+void Application::toggleWireframe()
+{
+    static bool wireframe = false;
+    wireframe = !wireframe;
+    glPolygonMode(GL_FRONT_AND_BACK, wireframe ? GL_LINE : GL_FILL);
+}
+
+glm::vec2 Application::mouseWorldPos() const
+{
+    int w, h;
+    glfwGetWindowSize(m_window, &w, &h);
+
+    glm::vec2 deviationFromMiddle = (glm::vec2{ m_mouseInfo.position.x / w, m_mouseInfo.position.y / h } - glm::vec2{0.5f, 0.5f})*2.0f;
+    deviationFromMiddle.y *= -1;
+    
+    return m_navigationInfo.cameraPosition + deviationFromMiddle / m_navigationInfo.cameraZoom;
+}
+
 
 void Application::initialize()
 {
@@ -209,6 +241,16 @@ void Application::keyCallback(GLFWwindow* window, int key, int scancode, int act
 {
     std::cout << "Key event: " << key
         << " scancode: " << scancode << " action: " << action << " mods: " << mods << std::endl;
+
+    if (action) {
+        switch (key)
+        {
+            case GLFW_KEY_F6:
+                App->toggleWireframe();
+            default:
+                break;
+        }
+    }
 }
 
 void Application::mouseButtonCallback(GLFWwindow* window, int button, int action, int mods)
@@ -236,8 +278,6 @@ void Application::mouseButtonCallback(GLFWwindow* window, int button, int action
 
 void Application::scrollCallback(GLFWwindow* window, double xoffset, double yoffset)
 {
-    std::cout << "Scroll event "
-        << " xoffset: " << xoffset << " yoffset: " << yoffset << std::endl;
 
     if (yoffset > 0) {
         App->onScrollUp(yoffset);
@@ -246,3 +286,4 @@ void Application::scrollCallback(GLFWwindow* window, double xoffset, double yoff
         App->onScrollDown(-yoffset);
     }
 }
+

@@ -251,5 +251,5 @@ double TriangleHandler::calculateTriangleCost(uint32_t index)
 	//const double slRatio = std::ranges::max(lenghts) / std::ranges::min(lenghts);
 
 
-	return (0.000001+colorDiff) * ((totalSideLen/**slRation*/));
+	return (0.0001+colorDiff) * ((totalSideLen/**slRation*/));
 }

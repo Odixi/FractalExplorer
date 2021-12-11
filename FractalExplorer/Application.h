@@ -24,11 +24,19 @@ private:
 	static void mouseButtonCallback(GLFWwindow* window, int button, int action, int mods);
 	static void scrollCallback(GLFWwindow* window, double xoffset, double yoffset);
 
+	void zoom(float multiplier);
+	void toggleWireframe();
+
+	glm::vec2 mouseWorldPos() const;
+
 	GLFWwindow* m_window = nullptr;
 
 	struct NavigationInfo {
-		glm::vec2 position = {0,0};
-		float zoom = 1;
+		glm::vec2 cameraPosition = {0,0};
+		glm::vec2 realPosition = { 0,0 };
+		float cameraZoom = 1;
+		float realZoom = 1;
+		float interpalotionValue = 0.95f;
 	} m_navigationInfo;
 
 	struct MouseInfo {
