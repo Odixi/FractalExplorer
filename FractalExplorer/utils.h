@@ -47,6 +47,11 @@ namespace geom {
 				point.x <= maxPoint.x && point.y <= maxPoint.y;
 		}
 
+		constexpr bool collidesWith(const BBox2& other) const{
+			return !(minPoint.x > other.maxPoint.x || maxPoint.x < other.minPoint.x ||
+					 minPoint.y > other.maxPoint.y || maxPoint.y < other.minPoint.y);
+		}
+
 		template<typename Container>
 		bool containsAll(const Container& points) const{
 			return std::ranges::all_of(points, [&](const glm::vec2& p) {return containsPoint(p); });

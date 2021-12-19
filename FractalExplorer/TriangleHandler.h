@@ -9,11 +9,17 @@ struct Vertex {
 	Color color;
 };
 
+struct TriangleInfo {
+	double cost;
+	int neighbors[3];
+};
+
 
 using VertexGenerator = std::function<Vertex(glm::vec2, double, int)>;
 
 namespace constants {
 	constexpr size_t maxVertices = 100000;
+
 }
 
 class TriangleHandler
@@ -34,7 +40,10 @@ private:
 	// Note: triangles should already be removed!
 	void removeVerices(const std::vector<uint32_t>& vertexIndices);
 
+	// start index
 	double calculateTriangleCost(uint32_t index);
+
+	void validateTriangleNegihbors();
 
 	VertexGenerator m_vertexGenerator;
 
@@ -47,6 +56,6 @@ private:
 	std::vector<int> m_nrVertRef; // Number of trianlges a vertex refers to
 	std::vector<uint32_t> m_freeEntries; // array of indices that are free in m_vertices
 
-	std::vector<double> m_triangleCosts;
+	std::vector<TriangleInfo> m_triangleInfos;
 };
 

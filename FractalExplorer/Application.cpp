@@ -79,7 +79,7 @@ void Application::run()
     auto zoomUniformId = glGetUniformLocation(program->getId(), "zoom");
 
     constexpr auto getColor = [](double value)->Color {
-        constexpr int divider = 400;
+        constexpr int divider = 500;
         const int floor = static_cast<int>(value);
         double v = (floor % divider) + value - floor;
         Color colors[] = {
@@ -108,8 +108,10 @@ void Application::run()
     TriangleHandler triangleHandler{ [](glm::vec2 pos, double scale, int maxIter ) {
         auto a = mandelbrot::calculateSmoothEscapeTime(std::complex<float>(pos.x, pos.y), maxIter);
         //float c = a / (double)maxIter;
-        return Vertex{ pos, getColor(a) };
+        return Vertex{ pos, getColor(a)};
     } };
+
+    glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
 
     /* Loop until the user closes the window */
     while (!glfwWindowShouldClose(m_window))
@@ -141,8 +143,8 @@ void Application::run()
         auto screenSize = glm::vec2{1,1} * (1.0f / m_navigationInfo.cameraZoom);
         geom::BBox2 screenBb{ m_navigationInfo.cameraPosition - (screenSize), m_navigationInfo.cameraPosition + (screenSize) };
 
-        triangleHandler.removeTrianglesOutsideScreen(screenBb, 10000);
-        triangleHandler.generateVertices(screenBb, 100);
+        triangleHandler.removeTrianglesOutsideScreen(screenBb, 2000);
+        triangleHandler.generateVertices(screenBb, 400);
         const auto& indices = triangleHandler.getIndeices();
         const auto& vertices = triangleHandler.getVertices();
 
@@ -197,7 +199,7 @@ glm::vec2 Application::mouseWorldPos() const
     glm::vec2 deviationFromMiddle = (glm::vec2{ m_mouseInfo.position.x / w, m_mouseInfo.position.y / h } - glm::vec2{0.5f, 0.5f})*2.0f;
     deviationFromMiddle.y *= -1;
     
-    return m_navigationInfo.cameraPosition + deviationFromMiddle / m_navigationInfo.cameraZoom;
+    return m_navigationInfo.realPosition + deviationFromMiddle / m_navigationInfo.realZoom;
 }
 
 
